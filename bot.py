@@ -124,7 +124,8 @@ async def cmd_start(message: Message):
         "/list - List all uploaded files\n"
         "/play - Start playing tracks automatically\n"
         "/shuffle - Play a random track\n"
-        "/stop - Stop playback"
+        "/stop - Stop playback\n"
+        "/source - View source code on GitHub"
     )
 
 
@@ -183,6 +184,16 @@ async def cmd_stop(message: Message):
         await message.answer("⏹️ Playback stopped.")
     else:
         await message.answer("Playback is not running.")
+
+
+@dp.message(Command("source"))
+async def cmd_source(message: Message):
+    await message.answer(
+        "📦 Source Code\n\n"
+        "This bot is open source and hosted on GitHub:\n"
+        "https://github.com/ugamochi/iriver-2k25\n\n"
+        "Deployed on Railway cloud platform."
+    )
 
 
 @dp.callback_query(F.data == "pause")
