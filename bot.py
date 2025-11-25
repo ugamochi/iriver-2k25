@@ -192,7 +192,7 @@ async def cmd_source(message: Message):
         "📦 Source Code\n\n"
         "This bot is open source and hosted on GitHub:\n"
         "https://github.com/ugamochi/iriver-2k25\n\n"
-        "Deployed on Railway cloud platform."
+        "Deployed on Fly.io (free tier)."
     )
 
 
