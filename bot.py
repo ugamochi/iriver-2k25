@@ -2,6 +2,8 @@ import asyncio
 import logging
 import os
 import random
+import signal
+import sys
 from typing import Optional
 
 from aiogram import Bot, Dispatcher, F
@@ -112,7 +114,10 @@ async def auto_play_loop(message: Message):
             break
         except Exception as e:
             logger.error(f"Error in auto_play_loop: {e}")
-            break
+            # If error occurs, wait a bit and try next track
+            await asyncio.sleep(2)
+            playback_state["current_index"] = (playback_state["current_index"] + 1) % len(library)
+            continue
 
 
 @dp.message(Command("start"))
@@ -125,8 +130,26 @@ async def cmd_start(message: Message):
         "/play - Start playing tracks automatically\n"
         "/shuffle - Play a random track\n"
         "/stop - Stop playback\n"
+        "/clear - Clear library\n"
         "/source - View source code on GitHub"
     )
+
+
+@dp.message(Command("clear"))
+async def cmd_clear(message: Message):
+    if not library:
+        await message.answer("Library is already empty.")
+        return
+        
+    if playback_state["is_playing"]:
+        playback_state["is_playing"] = False
+        if playback_state["task"]:
+            playback_state["task"].cancel()
+            playback_state["task"] = None
+            
+    library.clear()
+    playback_state["current_index"] = 0
+    await message.answer("🗑️ Library cleared.")
 
 
 @dp.message(Command("list"))
@@ -308,14 +331,45 @@ async def handle_audio(message: Message):
 
 async def main():
     logger.info("Starting bot...")
-    await dp.start_polling(bot)
+    
+    # Handle graceful shutdown
+    loop = asyncio.get_running_loop()
+    stop_event = asyncio.Event()
+    
+    def signal_handler():
+        logger.info("Received stop signal")
+        stop_event.set()
+        
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, signal_handler)
+        
+    # Run polling in background
+    polling_task = asyncio.create_task(dp.start_polling(bot))
+    
+    # Wait for stop signal
+    await stop_event.wait()
+    
+    logger.info("Shutting down...")
+    if playback_state["task"]:
+        playback_state["task"].cancel()
+        
+    polling_task.cancel()
+    try:
+        await polling_task
+    except asyncio.CancelledError:
+        pass
+        
+    await bot.session.close()
+    logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":
     try:
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        pass
     except Exception as e:
         logger.error(f"Bot error: {e}")
 
